@@ -2,10 +2,14 @@
 #include "../src/ray.h"
 #include "../src/vec3.h"
 #include "../src/utility_functions.hpp"
+#include "../src/sphere.hpp"
 #include <iostream>
 #include <stdlib.h>
-
-int samples_per_pixel=100;
+int spheres = 2;
+int planes = 2;
+int samples_per_pixel = 50; 
+Sphere sphereObjects[2];
+// Plane planeObjects[planes];
 
 // vec3 random_vec3() {
 //         return vec3(random_double(), random_double(), random_double());
@@ -14,124 +18,70 @@ int samples_per_pixel=100;
 // vec3 random_vec3(double min, double max) {
 //     return vec3(random_double(min,max), random_double(min,max), random_double(min,max));
 // }
+
 vec3 sample_square() {
     // Returns the vector to a random point in the [-.5,-.5]-[+.5,+.5] unit square.
     return vec3(random_double() - 0.5, random_double() - 0.5, 0);
 }
 
 
-double hit_sphere(const point3& center, double radius, const ray& r) {
-    vec3 oc = center - r.origin();
-    double a = dot(r.direction(), r.direction());
-    double b = - 2 * dot(r.direction(),oc);
-    double c = dot(oc,oc) - radius * radius;
-    double discriminant = b* b - 4 * a * c;
-    if(discriminant>=0){
-        return (-b-sqrt(discriminant)) / (2.0*a);
-    }
-    else
-        return -1;
-}
 
+void hit_objects(const ray& r) {
+    double t = 9999.0;
+    double temp_t;
+    int hitIdx = 0;
+    bool hit = false;
+    hit_record.t = -1.0;
+    for(int i=0; i<spheres; i++) {
+        temp_t = sphereObjects[i].hit_sphere(r);
+        if(temp_t >0 && temp_t < t) {
+            t = temp_t;
+            hitIdx = i;
+            hit = true;
+        }
+    }
+    if(hit){
+        hit_record.t = t;
+        hit_record.hitIdx = hitIdx; 
+    }   
+}
 
 // Coloring by outward normal
 
 color ray_color(const ray& r) {
     vec3  unit_direction = unit_vector(r.direction());
-    point3 C1 = point3(0,0,-1);
-    point3 C2 = point3(0,-100.5,-1);
-    double t1 = hit_sphere(C1, 0.5, r);
-    double t2 = hit_sphere(C2, 100, r); // ground
-    if(t1 > 0.0  && t2 > 0.0) {
-        if(t1 < t2) {
-            vec3 N = unit_vector(r.at(t1) - C1); // also we can use r.at(t)
-            // return color(1,0,0);
-            return 0.5 * color(N.x() + 1,N.y() + 1,N.z() + 1);
 
-        }
-
-      else {
-             vec3 N = unit_vector(r.at(t2) - C2); // also we can use r.at(t)
-            // return color(1,0,0);
-            return 0.5 * color(N.x() + 1,N.y() + 1,N.z() + 1);
-            }
-        
-      
-    }
-    else if(t1 > 0.0) {
-        vec3 N = unit_vector(r.at(t1) - C1); // also we can use r.at(t)
-        // return color(1,0,0);
+    hit_objects(r);
+    
+    if(hit_record.t > 0.0) {
+        vec3 N = unit_vector(r.at(hit_record.t) - sphereObjects[hit_record.hitIdx].getCenter()); // also we can use r.at(t)
         return 0.5 * color(N.x() + 1,N.y() + 1,N.z() + 1);
+    }    
 
-        }
-    else if(t2 > 0.0) {
-        vec3 N = unit_vector(r.at(t2) - C2); // also we can use r.at(t)
-        // return color(1,0,0);
-        return 0.5 * color(N.x() + 1,N.y() + 1,N.z() + 1);
-    }
     float a = 0.5 * (unit_direction.y() + 1.0);
     return (1.0- a) * color(1.0, 1.0, 1.0) + a * color(0.5, 0.7,1.0);
 }
-
 color ray_color(const ray& r, int depth) {
     if(depth == 0)
         return color(0,0,0);
     vec3  unit_direction = unit_vector(r.direction());
-    point3 C1 = point3(0,0,-1);
-    point3 C2 = point3(0,-100.5,-1);
-    double t1 = hit_sphere(C1, 0.5, r);
-    double t2 = hit_sphere(C2, 100.0, r);
-
-    if(t1 > 0.0  && t2 > 0.0) {
-        if(t1 < t2) {
-            vec3 N = unit_vector(r.at(t1) - C1); // also we can use r.at(t)
-            if(dot(N, r.direction()) < 0.0) {
-                vec3 direction = random_on_hemisphere(N);
-                ray new_ray(r.at(t1), unit_vector(direction));
-                return 0.5 * ray_color(new_ray, depth-1);
-            }
-            // return color(1,0,0);
-            // return 0.5 * color(N.x() + 1,N.y() + 1,N.z() + 1);
-        }
-        else {
-            vec3 N = unit_vector(r.at(t2) - C2); // also we can use r.at(t)
-            if(dot(N, r.direction()) < 0.0) {
-                vec3 direction = random_on_hemisphere(N);
-                ray new_ray(r.at(t2), unit_vector(direction));
-                return 0.5 * ray_color(new_ray, depth-1);
-            }
-            // return color(1,0,0);
-            // return 0.5 * color(N.x() + 1,N.y() + 1,N.z() + 1);
-
-        }
-    }
-    else if(t1 > 0.0) {
-        vec3 N = unit_vector(r.at(t1) - C1); // also we can use r.at(t)
+    
+    hit_objects(r);
+    if(hit_record.t > 0.0) {
+        vec3 N = unit_vector(r.at(hit_record.t) - sphereObjects[hit_record.hitIdx].getCenter()); // also we can use r.at(t)
         if(dot(N, r.direction()) < 0.0) {
             vec3 direction = random_on_hemisphere(N);
-            ray new_ray(r.at(t1), unit_vector(direction));
+            ray new_ray(r.at(hit_record.t), unit_vector(direction));
             return 0.5 * ray_color(new_ray, depth-1);
         }
-        // return color(1,0,0);
-        // return 0.5 * color(N.x() + 1,N.y() + 1,N.z() + 1);
-
-        }
-    else if(t2 > 0.0) {
-        vec3 N = unit_vector(r.at(t2) - C2); // also we can use r.at(t)
-        if(dot(N, r.direction()) < 0.0) {
-            vec3 direction = random_on_hemisphere(N);
-            ray new_ray(r.at(t2), unit_vector(direction));
-            return 0.5 * ray_color(new_ray, depth-1);
-        }
-        // return color(1,0,0);
-        // return 0.5 * color(N.x() + 1,N.y() + 1,N.z() + 1);
     }
 
     float a = 0.5 * (unit_direction.y() + 1.0);
     return (1.0- a) * color(1.0, 1.0, 1.0) + a * color(0.5, 0.7,1.0);
 }
-
 int main() {
+    // Init hit_record
+    hit_record.t = -1.0;
 
     // Image
 
@@ -160,11 +110,15 @@ int main() {
     point3 viewport_upper_left = camera_center - vec3(0,0,focal_length) - viewport_u / 2 - viewport_v /2;
     point3 pixel00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v);
 
+    // Add objects
+    sphereObjects[0] = Sphere(point3(0,0,-1), 0.5, 0.8, color(0.8f, 0.8f, 0.8f));
+    sphereObjects[1] = Sphere(point3(0,-100.5,-1), 100.0, 0.4, color(0.4f,0.6f,0.6f));
+
+
     // Render
 
     std::cout << "P3\n" << image_width << " " << image_height << "\n255\n";
-
-    for (int j = 0; j < image_height; j++) {
+        for (int j = 0; j < image_height; j++) {
         std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
         for (int i = 0; i < image_width; i++) {
             // anti aliasing

@@ -3,12 +3,16 @@
 #include "../src/vec3.h"
 #include "../src/utility_functions.hpp"
 #include "../src/sphere.hpp"
+#include "../src/plane.hpp"
+
 #include <iostream>
 #include <stdlib.h>
-int spheres = 2;
-int planes = 2;
-Sphere sphereObjects[2];
-// Plane planeObjects[planes];
+const int spheres = 2;
+const int planes = 0;
+Sphere sphereObjects[spheres];
+Sphere lightObjects[1];
+
+Plane planeObjects[planes];
 
 // vec3 random_vec3() {
 //         return vec3(random_double(), random_double(), random_double());
@@ -30,6 +34,16 @@ void hit_objects(const ray& r) {
             t = temp_t;
             hitIdx = i;
             hit = true;
+            hit_record.sphere = true;
+        }
+    }
+    for(int i=0; i<planes; i++) {
+        temp_t = planeObjects[i].hit_plane(r);
+        if(temp_t >0 && temp_t < t) {
+            t = temp_t;
+            hitIdx = i;
+            hit = true;
+            hit_record.sphere = false;
         }
     }
     if(hit){
@@ -53,6 +67,7 @@ color ray_color(const ray& r) {
     float a = 0.5 * (unit_direction.y() + 1.0);
     return (1.0- a) * color(1.0, 1.0, 1.0) + a * color(0.5, 0.7,1.0);
 }
+
 color ray_color(const ray& r, int depth) {
     if(depth == 0)
         return color(0,0,0);
@@ -60,16 +75,37 @@ color ray_color(const ray& r, int depth) {
     
     hit_objects(r);
     if(hit_record.t > 0.0) {
-        vec3 N = unit_vector(r.at(hit_record.t) - sphereObjects[hit_record.hitIdx].getCenter()); // also we can use r.at(t)
-        if(dot(N, r.direction()) < 0.0) {
-            vec3 direction = random_on_hemisphere(N);
+        if(hit_record.sphere) {
+            vec3 N = unit_vector(r.at(hit_record.t) - sphereObjects[hit_record.hitIdx].getCenter()); // also we can use r.at(t)
+            if(dot(N, r.direction()) < 0.0) {
+            vec3 direction = lightObjects[0].getCenter() - r.at(hit_record.t);//random_on_hemisphere(N);
             ray new_ray(r.at(hit_record.t), unit_vector(direction));
-            return 0.5 * ray_color(new_ray, depth-1);
+            hit_objects(new_ray);
+            if(hit_record.t == -1.0) {// hit light
+                return sphereObjects[hit_record.hitIdx].getKd() * sphereObjects[hit_record.hitIdx].getObjectColor() * std::max(0.0, dot(N, direction));
+
+            }
         }
+        }
+        else{
+            vec3 N = unit_vector(planeObjects[hit_record.hitIdx].getNormal());
+            if(dot(N, r.direction()) < 0.0) {
+                vec3 direction = lightObjects[0].getCenter() - r.at(hit_record.t);//random_on_hemisphere(N);
+                ray new_ray(r.at(hit_record.t), unit_vector(direction));
+                hit_objects(new_ray);
+                if(hit_record.t == -1.0) {// hit light
+                    return planeObjects[hit_record.hitIdx].getKd() * planeObjects[hit_record.hitIdx].getObjectColor() * std::max(0.0, dot(N, direction));
+
+                }
+            }
+            }
+
     }
 
-    float a = 0.5 * (unit_direction.y() + 1.0);
-    return (1.0- a) * color(1.0, 1.0, 1.0) + a * color(0.5, 0.7,1.0);
+        return color(0,0,0);
+
+    // float a = 0.5 * (unit_direction.y() + 1.0);
+    // return (1.0- a) * color(1.0, 1.0, 1.0) + a * color(0.5, 0.7,1.0);
 }
 int main() {
     // Init hit_record
@@ -103,9 +139,10 @@ int main() {
     point3 pixel00_loc = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v);
 
     // Add objects
-    sphereObjects[0] = Sphere(point3(0,0,-1), 0.5, 0.8, color(0.8f, 0.8f, 0.8f));
+    sphereObjects[0] = Sphere(point3(0,0.0,-1), 0.5, 0.8, color(0.8f, 0.4f, 0.8f));
     sphereObjects[1] = Sphere(point3(0,-100.5,-1), 100.0, 0.4, color(0.4f,0.6f,0.6f));
-
+    lightObjects[0] = Sphere(point3(0.5,0.5,1), 0.1, 1.0, color(1.0f,1.0f,1.0f));
+    // planeObjects[0] = Plane(point3(0,0,-1), unit_vector(vec3(0,1,1)), 0.6, color(1,0,0));
 
     // Render
 

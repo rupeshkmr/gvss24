@@ -14,3 +14,7 @@ target_link_libraries(sphere_anti_aliasing a1)
 
 add_executable(basic_tools basic_tools.cpp)
 target_link_libraries(basic_tools a1)
+
+add_executable(sphere_iterative_raytracing sphere_iterative_raytracing.cpp)
+target_link_libraries(sphere_iterative_raytracing a1)
+
